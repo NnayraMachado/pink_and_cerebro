@@ -6,7 +6,7 @@ import seaborn as sns
 from scipy.stats import lognorm, pareto
 import os
 
-CAMINHO_ARQUIVO = r"C:\Users\nirva\OneDrive\Área de Trabalho\NiR\PINK_CEREBRO\Resultados.csv"
+CAMINHO_ARQUIVO = "Resultados.csv"
 
 st.title("🔮 Sistema de Probabilidade - Análise & Simulação")
 
@@ -51,3 +51,4 @@ ax.legend()
 st.pyplot(fig)
 
 st.success("Simulação concluída!")
+
