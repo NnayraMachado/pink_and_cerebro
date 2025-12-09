@@ -8,14 +8,14 @@ import os
 
 CAMINHO_ARQUIVO = "Resultados.csv"
 
-st.title("🔮 Sistema de Probabilidade - Análise & Simulação")
+st.title("Sistema de Probabilidade - Análise & Simulação")
 
 st.write("Carregando dados...")
 df = pd.read_csv(CAMINHO_ARQUIVO)
 
 x = df["valor"].dropna().values
 
-st.subheader("📊 Estatísticas Descritivas")
+st.subheader("Estatísticas Descritivas")
 st.write(df.describe())
 
 # Histograma
@@ -39,7 +39,7 @@ def sorteio():
     else:
         return pareto(*params_pareto).rvs()
 
-st.subheader("🎲 Simulação Monte Carlo")
+st.subheader("Simulação Monte Carlo")
 n = st.slider("Número de sorteios", 100, 20000, 5000)
 
 sim = np.array([sorteio() for _ in range(n)])
@@ -51,4 +51,5 @@ ax.legend()
 st.pyplot(fig)
 
 st.success("Simulação concluída!")
+
 
