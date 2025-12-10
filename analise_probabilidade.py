@@ -19,7 +19,7 @@ from sklearn.mixture import GaussianMixture
 # CONFIGURAÇÃO
 # ----------------------------------------------------------
 
-CAMINHO_ARQUIVO = r"C:\Users\nirva\OneDrive\Área de Trabalho\NiR\PINK_CEREBRO\Resultados.csv"
+CAMINHO_ARQUIVO = "Resultados.csv"
 COLUNA_VALOR = "valor"     # nome da coluna no CSV
 
 # ----------------------------------------------------------
@@ -160,3 +160,4 @@ pd.DataFrame([resultado_dict]).to_csv("resultados_distribuicao.csv", index=False
 
 print("\nArquivo resultados_distribuicao.csv criado!")
 print("\n=== FINALIZADO ===")
+
