@@ -46,22 +46,30 @@ print("\nPercentis:")
 print(percentis)
 
 # ----------------------------------------------------------
-# 3) HISTOGRAMA E BOXPLOT
+# 3) HISTOGRAMA E BOXPLOT (mesmos dados da estatística)
 # ----------------------------------------------------------
 
 os.makedirs("graficos", exist_ok=True)
 
-'plt.figure(figsize=(10,5))
-'sns.histplot(x, bins=60, kde=True)
-'plt.title("Histograma + KDE")
-'plt.savefig("graficos/histograma.png")
-'plt.close()
+# Histograma + KDE
+plt.figure(figsize=(10, 5))
+sns.histplot(df[COLUNA_VALOR], bins=60, kde=True)
+plt.title("Histograma + KDE")
+plt.xlabel(COLUNA_VALOR)
+plt.ylabel("Frequência")
+plt.tight_layout()
+plt.savefig("graficos/histograma.png")
+plt.close()
 
-'plt.figure(figsize=(8,3))
-'sns.boxplot(x=x)
-'plt.title("Boxplot dos valores")
-'plt.savefig("graficos/boxplot.png")
-'plt.close()
+# Boxplot
+plt.figure(figsize=(8, 3))
+sns.boxplot(x=df[COLUNA_VALOR])
+plt.title("Boxplot dos valores")
+plt.xlabel(COLUNA_VALOR)
+plt.tight_layout()
+plt.savefig("graficos/boxplot.png")
+plt.close()
+
 
 # =======================================
 # 1 — Ler arquivo Excel
@@ -253,6 +261,7 @@ pd.DataFrame([resultado_dict]).to_csv("resultados_distribuicao.csv", index=False
 
 print("\nArquivo resultados_distribuicao.csv criado!")
 print("\n=== FINALIZADO ===")
+
 
 
 
