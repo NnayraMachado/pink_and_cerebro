@@ -131,6 +131,31 @@ print(df_histograma)
 # =======================================
 df_histograma.to_excel("histograma_saida.xlsx", index=False)
 
+# =======================================
+# 10 — Criar gráfico do histograma com bins definidos
+# =======================================
+
+plt.figure(figsize=(10,5))
+
+# Plot do histograma (somente valores válidos)
+plt.hist(dados_validos, bins=bins + [dados_validos.max()], edgecolor='black')
+
+plt.title("Histograma por Intervalos (mesmos do Excel)")
+plt.xlabel("Valores")
+plt.ylabel("Frequência")
+
+# Marca de intervalo no eixo x
+plt.xticks(bins + [dados_validos.max()])
+
+# Cria pasta se não existir
+os.makedirs("graficos", exist_ok=True)
+
+plt.savefig("graficos/histograma_intervalos_excel.png")
+plt.close()
+
+print("Histograma por intervalos salvo em graficos/histograma_intervalos_excel.png")
+
+
 # ----------------------------------------------------------
 # 4) TESTE DE DISTRIBUIÇÕES COMUNS (KS e AD)
 # ----------------------------------------------------------
@@ -228,5 +253,6 @@ pd.DataFrame([resultado_dict]).to_csv("resultados_distribuicao.csv", index=False
 
 print("\nArquivo resultados_distribuicao.csv criado!")
 print("\n=== FINALIZADO ===")
+
 
 
