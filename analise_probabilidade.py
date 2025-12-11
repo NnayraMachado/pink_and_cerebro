@@ -46,123 +46,53 @@ print("\nPercentis:")
 print(percentis)
 
 # ----------------------------------------------------------
-# 3) HISTOGRAMA E BOXPLOT (mesmos dados da estatística)
+# 3) HISTOGRAMA E BOXPLOT
 # ----------------------------------------------------------
 
 os.makedirs("graficos", exist_ok=True)
 
-# Histograma + KDE
 plt.figure(figsize=(10, 5))
 sns.histplot(df[COLUNA_VALOR], bins=60, kde=True)
 plt.title("Histograma + KDE")
-plt.xlabel(COLUNA_VALOR)
-plt.ylabel("Frequência")
-plt.tight_layout()
 plt.savefig("graficos/histograma.png")
 plt.close()
 
-# Boxplot
 plt.figure(figsize=(8, 3))
 sns.boxplot(x=df[COLUNA_VALOR])
-plt.title("Boxplot dos valores")
-plt.xlabel(COLUNA_VALOR)
-plt.tight_layout()
+plt.title("Boxplot")
 plt.savefig("graficos/boxplot.png")
 plt.close()
 
+# ----------------------------------------------------------
+# HISTOGRAMA
+# ----------------------------------------------------------
 
-# =======================================
-# 1 — Ler arquivo Excel
-# =======================================
-df = pd.read_excel("Resultados.xlsm")   # substitua pelo nome do seu arquivo
+dados = df[COLUNA_VALOR].dropna()
+vazios = df[COLUNA_VALOR].isna().sum()
 
-# Pega a coluna A
-dados = df.iloc[:, 0]   # primeira coluna (índice zero)
-
-# =======================================
-# 2 — Separar valores numéricos e vazios
-# =======================================
-# Conta vazios
-vazios = dados.isna().sum()
-
-# Remove vazios para o histograma
-dados_validos = dados.dropna()
-
-# =======================================
-# 3 — Definir os bins (intervalos)
-# Igual ao seu código VBA
-# =======================================
 bins = [0, 10, 20, 30, 40, 50, 100]
+frequencias, _ = np.histogram(dados, bins=bins)
 
-# =======================================
-# 4 — Calcular frequência por intervalo
-# =======================================
-frequencias, _ = np.histogram(dados_validos, bins=bins)
-
-# =======================================
-# 5 — Construir as faixas do histograma
-# =======================================
-faixas = []
-for i in range(1, len(bins)):
-    faixas.append(f"Maior que {bins[i-1]} e até {bins[i]}")
-
-# Adiciona a faixa "Acima de"
+faixas = [f"Maior que {bins[i-1]} e até {bins[i]}" for i in range(1, len(bins))]
 faixas.append(f"Acima de {bins[-1]}")
 
-# =======================================
-# 6 — Contar valores acima do último bin
-# =======================================
-acima = (dados_validos > bins[-1]).sum()
-
-# =======================================
-# 7 — Criar DataFrame da tabela final
-# =======================================
-intervalos = bins + ["Vazios"]
-
-frequencias_final = list(frequencias) + [acima] + [vazios]
-
-faixas_final = faixas + ["Células sem valor"]
+acima = (dados > bins[-1]).sum()
 
 df_histograma = pd.DataFrame({
-    "Intervalo": intervalos,
-    "Frequência": frequencias_final,
-    "Faixa": faixas_final
+    "Faixa": faixas + ["Células sem valor"],
+    "Frequência": list(frequencias) + [acima] + [vazios]
 })
 
-# =======================================
-# 8 — Mostrar resultado
-# =======================================
 print(df_histograma)
 
-# =======================================
-# 9 — Exportar para Excel (opcional)
-# =======================================
 df_histograma.to_excel("histograma_saida.xlsx", index=False)
 
-# =======================================
-# 10 — Criar gráfico do histograma com bins definidos
-# =======================================
-
 plt.figure(figsize=(10,5))
-
-# Plot do histograma (somente valores válidos)
-plt.hist(dados_validos, bins=bins + [dados_validos.max()], edgecolor='black')
-
-plt.title("Histograma por Intervalos (mesmos do Excel)")
-plt.xlabel("Valores")
-plt.ylabel("Frequência")
-
-# Marca de intervalo no eixo x
-plt.xticks(bins + [dados_validos.max()])
-
-# Cria pasta se não existir
-os.makedirs("graficos", exist_ok=True)
-
+plt.bar(df_histograma["Faixa"], df_histograma["Frequência"])
+plt.xticks(rotation=45)
+plt.title("Histograma - Intervalos Excel")
 plt.savefig("graficos/histograma_intervalos_excel.png")
 plt.close()
-
-print("Histograma por intervalos salvo em graficos/histograma_intervalos_excel.png")
-
 
 # ----------------------------------------------------------
 # 4) TESTE DE DISTRIBUIÇÕES COMUNS (KS e AD)
@@ -261,6 +191,7 @@ pd.DataFrame([resultado_dict]).to_csv("resultados_distribuicao.csv", index=False
 
 print("\nArquivo resultados_distribuicao.csv criado!")
 print("\n=== FINALIZADO ===")
+
 
 
 
