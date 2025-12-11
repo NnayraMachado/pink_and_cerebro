@@ -26,7 +26,7 @@ st.divider()
 # ---------------------------------------------------------
 # HISTOGRAMA
 # ---------------------------------------------------------
-st.subheader("Histograma por Intervalos (Excel-like)")
+st.subheader("Histograma por Intervalos")
 
 bins = [0,10,20,30,40,50,100]
 frequencias, _ = np.histogram(dados, bins=bins)
@@ -96,3 +96,4 @@ sns.kdeplot(dados, ax=ax, label="Real")
 ax.legend()
 ax.set_title("Distribuição Real vs Simulada")
 st.pyplot(fig)
+
