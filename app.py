@@ -48,7 +48,7 @@ st.markdown("<br>", unsafe_allow_html=True)
 st.divider()
 
 # ---------------------------------------------------------
-# HISTOGRAMA POR INTERVALOS (EXCEL-LIKE)
+# HISTOGRAMA POR INTERVALOS
 # ---------------------------------------------------------
 st.subheader("Histograma por Intervalos")
 
@@ -69,7 +69,7 @@ df_hist = pd.DataFrame({
 
 st.write(df_hist)
 
-# Gráfico Excel-like
+# Gráfico
 fig, ax = plt.subplots(figsize=(10,4))
 ax.bar(df_hist["Faixa"], df_hist["Frequência"], color="steelblue")
 plt.xticks(rotation=45)
@@ -126,3 +126,4 @@ ax.set_title("Distribuição Real vs Simulada")
 st.pyplot(fig)
 
 st.success("Simulação concluída!")
+
