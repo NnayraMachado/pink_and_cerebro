@@ -77,6 +77,55 @@ st.markdown("<br>", unsafe_allow_html=True)
 st.divider()
 
 # ---------------------------------------------------------
+# QUARTIS POR INTERVALOS
+# ---------------------------------------------------------
+
+# Coluna original (mantém os NaN)
+dados = df[COLUNA_VALOR]
+
+# Somente valores válidos
+dados_validos = dados.dropna().astype(float)
+
+# Contagens
+total_registros = len(dados)
+validos = len(dados_validos)
+nulos = dados.isna().sum()
+
+# Quartis
+Q0 = np.min(dados_validos)                     # Mínimo
+Q1 = np.percentile(dados_validos, 25)          # 25%
+Q2 = np.percentile(dados_validos, 50)          # Mediana
+Q3 = np.percentile(dados_validos, 75)          # 75%
+Q4 = np.max(dados_validos)                     # Máximo
+
+# Tabela organizada como no Excel
+df_quartis = pd.DataFrame({
+    "Medida": [
+        "Total de Registros",
+        "Valores Válidos",
+        "Valores Nulos",
+        "Q0 (Mínimo)",
+        "Q1 (25%)",
+        "Q2 (50% — Mediana)",
+        "Q3 (75%)",
+        "Q4 (Máximo)"
+    ],
+    "Valor": [
+        total_registros,
+        validos,
+        nulos,
+        Q0,
+        Q1,
+        Q2,
+        Q3,
+        Q4
+    ]
+})
+
+print("\n===== TABELA DE QUARTIS (PYTHON) =====")
+print(df_quartis)
+
+# ---------------------------------------------------------
 # HISTOGRAMA POR INTERVALOS
 # ---------------------------------------------------------
 st.subheader("Histograma por Intervalos")
@@ -212,5 +261,6 @@ ax.set_title("Distribuição Real vs Simulada")
 st.pyplot(fig)
 
 st.success("Simulação concluída!")
+
 
 
