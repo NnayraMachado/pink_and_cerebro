@@ -80,50 +80,60 @@ st.divider()
 # QUARTIS POR INTERVALOS
 # ---------------------------------------------------------
 
-# Coluna original (mantém os NaN)
-dados = df[COLUNA_VALOR]
+st.subheader("Quartis (Q0, Q1, Q2, Q3, Q4)")
 
-# Somente valores válidos
-dados_validos = dados.dropna().astype(float)
-
-# Contagens
-total_registros = len(dados)
-validos = len(dados_validos)
-nulos = dados.isna().sum()
+# Dados válidos para cálculo
+dados_validos = df["valor"].dropna().astype(float)
 
 # Quartis
-Q0 = np.min(dados_validos)                     # Mínimo
-Q1 = np.percentile(dados_validos, 25)          # 25%
-Q2 = np.percentile(dados_validos, 50)          # Mediana
-Q3 = np.percentile(dados_validos, 75)          # 75%
-Q4 = np.max(dados_validos)                     # Máximo
+Q0 = np.min(dados_validos)
+Q1 = np.percentile(dados_validos, 25)
+Q2 = np.percentile(dados_validos, 50)
+Q3 = np.percentile(dados_validos, 75)
+Q4 = np.max(dados_validos)
 
-# Tabela organizada como no Excel
+# Tabela
 df_quartis = pd.DataFrame({
-    "Medida": [
-        "Total de Registros",
-        "Valores Válidos",
-        "Valores Nulos",
-        "Q0 (Mínimo)",
-        "Q1 (25%)",
-        "Q2 (50% — Mediana)",
-        "Q3 (75%)",
-        "Q4 (Máximo)"
-    ],
-    "Valor": [
-        total_registros,
-        validos,
-        nulos,
-        Q0,
-        Q1,
-        Q2,
-        Q3,
-        Q4
-    ]
+    "Quartil": ["Q0 (Mínimo)", "Q1 (25%)", "Q2 (Mediana)", "Q3 (75%)", "Q4 (Máximo)"],
+    "Valor": [Q0, Q1, Q2, Q3, Q4]
 })
 
-print("\n===== TABELA DE QUARTIS (PYTHON) =====")
-print(df_quartis)
+st.write(df_quartis)
+
+st.markdown("<br>", unsafe_allow_html=True)
+
+# ---------------------------------------------------------
+# GRÁFICO 1 — HISTOGRAMA + LINHAS DOS QUARTIS
+# ---------------------------------------------------------
+
+fig, ax = plt.subplots(figsize=(10,4))
+sns.histplot(dados_validos, bins=60, kde=True, ax=ax, color="steelblue")
+
+ax.axvline(Q0, color="black", linestyle="--", linewidth=1.5, label=f"Q0 (min) = {Q0:.2f}")
+ax.axvline(Q1, color="blue", linestyle="--", linewidth=1.8, label=f"Q1 = {Q1:.2f}")
+ax.axvline(Q2, color="green", linestyle="--", linewidth=2.2, label=f"Q2 = {Q2:.2f}")
+ax.axvline(Q3, color="orange", linestyle="--", linewidth=1.8, label=f"Q3 = {Q3:.2f}")
+ax.axvline(Q4, color="red", linestyle="--", linewidth=1.5, label=f"Q4 (máx) = {Q4:.2f}")
+
+ax.legend()
+ax.set_title("Histograma com Quartis (Q0, Q1, Q2, Q3, Q4)")
+
+st.pyplot(fig)
+
+st.markdown("<br><br>", unsafe_allow_html=True)
+st.divider()
+
+# ---------------------------------------------------------
+# GRÁFICO 2 — BOXPLOT DOS QUARTIS
+# ---------------------------------------------------------
+
+st.subheader("Boxplot dos Quartis")
+
+fig, ax = plt.subplots(figsize=(10,3))
+sns.boxplot(x=dados_validos, ax=ax, color="skyblue")
+ax.set_title("Boxplot – Distribuição dos Quartis")
+
+st.pyplot(fig)
 
 # ---------------------------------------------------------
 # HISTOGRAMA POR INTERVALOS
@@ -261,6 +271,7 @@ ax.set_title("Distribuição Real vs Simulada")
 st.pyplot(fig)
 
 st.success("Simulação concluída!")
+
 
 
 
