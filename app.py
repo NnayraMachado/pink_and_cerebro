@@ -97,3 +97,6 @@ ax.legend()
 ax.set_title("Distribuição Real vs Simulada")
 st.pyplot(fig)
 
+st.success("Simulação concluída!")
+
+
