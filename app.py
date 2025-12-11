@@ -244,6 +244,131 @@ ax.set_xlabel("X")
 ax.set_ylabel("Densidade")
 st.pyplot(fig)
 
+# =========================================================
+# TESTES DE ADERÊNCIA — KS, AD, AIC, BIC
+# =========================================================
+
+st.markdown("<br><br>", unsafe_allow_html=True)
+st.divider()
+st.subheader("Teste de Aderência – KS, AD, AIC, BIC")
+
+from scipy.stats import kstest, anderson, norm, lognorm, expon, pareto
+import math
+
+
+# ---------------------------------------------------------
+# Função auxiliar: calcular log-verossimilhança
+# ---------------------------------------------------------
+def log_likelihood(dist, params, data):
+    try:
+        pdf_vals = dist.pdf(data, *params)
+        pdf_vals[pdf_vals <= 0] = 1e-12
+        return np.sum(np.log(pdf_vals))
+    except:
+        return -np.inf
+
+
+# ---------------------------------------------------------
+# Distribuições candidatas
+# ---------------------------------------------------------
+distros = {
+    "Normal": norm,
+    "Lognormal": lognorm,
+    "Exponencial": expon,
+    "Pareto": pareto
+}
+
+resultados = []
+
+for nome, dist in distros.items():
+
+    # Ajuste da distribuição
+    params = dist.fit(dados_validos)
+
+    # KS
+    D, p_ks = kstest(dados_validos, dist.cdf, params)
+
+    # AD
+    try:
+        ad = anderson(dados_validos, dist='norm') if nome=="Normal" else anderson(dados_validos)
+        AD = ad.statistic
+    except:
+        AD = np.nan
+
+    # AIC / BIC
+    ll = log_likelihood(dist, params, dados_validos)
+    k = len(params)
+    n = len(dados_validos)
+
+    AIC = 2 * k - 2 * ll
+    BIC = k * math.log(n) - 2 * ll
+
+    resultados.append([nome, D, p_ks, AD, AIC, BIC, params])
+
+
+# ---------------------------------------------------------
+# Tabela organizada
+# ---------------------------------------------------------
+df_aderencia = pd.DataFrame(
+    resultados,
+    columns=["Distribuição", "KS (D)", "KS p-valor", "AD", "AIC", "BIC", "Parâmetros"]
+)
+
+# Ordenar pela melhor métrica (menor KS)
+df_aderencia = df_aderencia.sort_values("KS (D)")
+
+st.write(df_aderencia)
+
+# Melhor distribuição encontrada
+melhor = df_aderencia.iloc[0]
+st.success(f"Melhor ajuste (menor KS): **{melhor['Distribuição']}**  — D = {melhor['KS (D)']:.4f}")
+
+
+# =========================================================
+# GRÁFICOS — CDF e PDF COMPARANDO REAL VS AJUSTADO
+# =========================================================
+
+st.subheader("CDF Real vs Ajustada")
+
+dist_melhor = distros[melhor["Distribuição"]]
+params_melhor = melhor["Parâmetros"]
+
+# Dados ordenados
+x_sorted = np.sort(dados_validos)
+cdf_real = np.arange(1, len(x_sorted)+1) / len(x_sorted)
+cdf_ajustada = dist_melhor.cdf(x_sorted, *params_melhor)
+
+fig, ax = plt.subplots(figsize=(10,4))
+ax.plot(x_sorted, cdf_real, label="CDF Real", linewidth=2)
+ax.plot(x_sorted, cdf_ajustada, label=f"CDF Ajustada — {melhor['Distribuição']}", linestyle="--")
+ax.legend()
+ax.set_title("Comparação da CDF Real vs Ajustada")
+st.pyplot(fig)
+
+# =========================================================
+# PDF COMPARAÇÃO
+# =========================================================
+
+st.subheader("PDF Real (KDE) vs PDF Ajustada")
+
+# KDE real
+kde = sns.kdeplot(dados_validos, bw_adjust=1).get_lines()[0].get_data()
+plt.close()  # evita plot anterior
+
+x_kde, y_kde = kde
+
+# PDF ajustada
+pdf_ajustada = dist_melhor.pdf(x_kde, *params_melhor)
+
+fig, ax = plt.subplots(figsize=(10,4))
+ax.plot(x_kde, y_kde, label="PDF Real (KDE)", linewidth=2)
+ax.plot(x_kde, pdf_ajustada, label=f"PDF Ajustada — {melhor['Distribuição']}", linestyle="--")
+ax.legend()
+ax.set_title("Comparação da PDF Real (KDE) vs Ajustada")
+st.pyplot(fig)
+
+
+
 # ---------------------------------------------------------
 # DISTRIBUIÇÃO MISTA E SIMULAÇÃO
 # ---------------------------------------------------------
@@ -271,6 +396,7 @@ ax.set_title("Distribuição Real vs Simulada")
 st.pyplot(fig)
 
 st.success("Simulação concluída!")
+
 
 
 
