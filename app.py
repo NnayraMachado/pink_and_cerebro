@@ -94,7 +94,7 @@ Q4 = np.max(dados_validos)
 
 # Tabela
 df_quartis = pd.DataFrame({
-    "Quartil": ["Q0 (Mínimo)", "Q1 (25%)", "Q2 (Mediana)", "Q3 (75%)", "Q4 (Máximo)"],
+    "Quartil": ["Q0 (Mínimo)", "Q1 (25%)", "Q2 (50% - Mediana)", "Q3 (75%)", "Q4 (Máximo)"],
     "Valor": [Q0, Q1, Q2, Q3, Q4]
 })
 
@@ -271,6 +271,7 @@ ax.set_title("Distribuição Real vs Simulada")
 st.pyplot(fig)
 
 st.success("Simulação concluída!")
+
 
 
 
