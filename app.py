@@ -126,7 +126,7 @@ def stress_test(banca, aposta, n_rodadas, n_sessoes):
 # INTERFACE
 # =========================================================
 
-st.title("📊 Sistema de Probabilidade, Simulação e Decisão")
+st.title("Sistema de Probabilidade, Simulação e Decisão")
 
 aba1, aba2, aba3, aba4 = st.tabs([
     "📊 Resumo",
@@ -230,3 +230,4 @@ with aba4:
         - Cenário extremo (1%): **{formatar_num(np.percentile(finais, 1))}**
         """
     )
+
