@@ -1,198 +1,175 @@
-# ==========================================================
-#  SISTEMA DE ANÁLISE E SIMULAÇÃO DE DISTRIBUIÇÃO MISTA
-# ==========================================================
-#  Carrega dados reais, realiza análises, ajusta distribuições,
-#  valida com KS/AD, cria distribuição mista e gera simulações
-# ==========================================================
-
-import os
+import streamlit as st
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-import seaborn as sns
 
-from scipy.stats import lognorm, pareto, kstest, anderson
-from scipy.stats.mstats import winsorize
-from sklearn.mixture import GaussianMixture
-
-# ----------------------------------------------------------
+# =========================================================
 # CONFIGURAÇÃO
-# ----------------------------------------------------------
+# =========================================================
 
 CAMINHO_ARQUIVO = "Resultados.csv"
-COLUNA_VALOR = "valor"     # nome da coluna no CSV
+COLUNA_VALOR = "valor"
 
-# ----------------------------------------------------------
-# 1) CARREGAR DADOS
-# ----------------------------------------------------------
+st.set_page_config(
+    page_title="Probabilidade Condicional",
+    layout="wide"
+)
 
-print("Carregando dados...")
-df = pd.read_csv(CAMINHO_ARQUIVO, sep=",")
-df = df.dropna()
+# =========================================================
+# UTILIDADES
+# =========================================================
 
-x = df[COLUNA_VALOR].values.astype(float)
+def formatar(x, casas=2):
+    return f"{x:,.{casas}f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
-print(f"Total de registros carregados: {len(x)}")
+# =========================================================
+# CACHE DE DADOS
+# =========================================================
 
-# ----------------------------------------------------------
-# 2) ANÁLISE DESCRITIVA
-# ----------------------------------------------------------
+@st.cache_data(show_spinner=False)
+def carregar_dados():
+    df = pd.read_csv(CAMINHO_ARQUIVO)
+    return df[COLUNA_VALOR].dropna().astype(float)
 
-print("\n===== DESCRITIVO =====")
-print(df[COLUNA_VALOR].describe())
+dados = carregar_dados()
 
-percentis = df[COLUNA_VALOR].quantile([0.5, 0.75, 0.90, 0.95, 0.99])
-print("\nPercentis:")
-print(percentis)
+# =========================================================
+# PROBABILIDADE CONDICIONAL 
+# =========================================================
 
-# ----------------------------------------------------------
-# 3) HISTOGRAMA E BOXPLOT
-# ----------------------------------------------------------
+def distribuicao_condicional(dados, x_atual):
+    """Distribuição dos multiplicadores finais dado que o jogo já chegou em x_atual"""
+    return dados[dados >= x_atual]
 
-os.makedirs("graficos", exist_ok=True)
 
-plt.figure(figsize=(10, 5))
-sns.histplot(df[COLUNA_VALOR], bins=60, kde=True)
-plt.title("Histograma + KDE")
-plt.savefig("graficos/histograma.png")
-plt.close()
+def prob_atingir(dados, x_atual, alvo):
+    cond = distribuicao_condicional(dados, x_atual)
+    if len(cond) == 0 or alvo < x_atual:
+        return 0.0
+    return np.mean(cond >= alvo)
 
-plt.figure(figsize=(8, 3))
-sns.boxplot(x=df[COLUNA_VALOR])
-plt.title("Boxplot")
-plt.savefig("graficos/boxplot.png")
-plt.close()
 
-# ----------------------------------------------------------
-# HISTOGRAMA
-# ----------------------------------------------------------
+def valor_esperado_continuar(x_atual, alvo, prob):
+    """
+    EV simples e honesto:
+    - se chegar no alvo → ganha (alvo - x_atual)
+    - se crashar antes → perde x_atual
+    """
+    ganho = alvo - x_atual
+    perda = x_atual
+    return prob * ganho - (1 - prob) * perda
 
-dados = df[COLUNA_VALOR].dropna()
-vazios = df[COLUNA_VALOR].isna().sum()
 
-bins = [0, 10, 20, 30, 40, 50, 100]
-frequencias, _ = np.histogram(dados, bins=bins)
+def melhor_cashout(dados, x_atual, alvos):
+    resultados = []
 
-faixas = [f"Maior que {bins[i-1]} e até {bins[i]}" for i in range(1, len(bins))]
-faixas.append(f"Acima de {bins[-1]}")
+    for alvo in alvos:
+        p = prob_atingir(dados, x_atual, alvo)
+        ev = valor_esperado_continuar(x_atual, alvo, p)
+        resultados.append((alvo, p, ev))
 
-acima = (dados > bins[-1]).sum()
+    return sorted(resultados, key=lambda x: x[2], reverse=True)
 
-df_histograma = pd.DataFrame({
-    "Faixa": faixas + ["Células sem valor"],
-    "Frequência": list(frequencias) + [acima] + [vazios]
-})
+# =========================================================
+# INTERFACE
+# =========================================================
 
-print(df_histograma)
+st.title("✈️ Aviator — Análise Condicional em Tempo Real")
 
-df_histograma.to_excel("histograma_saida.xlsx", index=False)
+aba1, aba2 = st.tabs([
+    "📊 Visão Geral",
+    "🧠 Decisão Condicional"
+])
 
-plt.figure(figsize=(10,5))
-plt.bar(df_histograma["Faixa"], df_histograma["Frequência"])
-plt.xticks(rotation=45)
-plt.title("Histograma - Intervalos Excel")
-plt.savefig("graficos/histograma_intervalos_excel.png")
-plt.close()
+# =========================================================
+# ABA 1 — VISÃO GERAL (ENXUTA)
+# =========================================================
 
-# ----------------------------------------------------------
-# 4) TESTE DE DISTRIBUIÇÕES COMUNS (KS e AD)
-# ----------------------------------------------------------
+with aba1:
+    c1, c2, c3 = st.columns(3)
 
-from scipy import stats
+    c1.metric("Total de jogos", f"{len(dados):,}")
+    c2.metric("Multiplicador médio", formatar(dados.mean()))
+    c3.metric("Máximo histórico", formatar(dados.max()))
 
-def testar_distribuicao(dist, nome):
-    params = dist.fit(x)
-    ks = kstest(x, dist.name, params)
-    ad = anderson(x, dist=dist.name if dist.name in ["expon", "norm", "lognorm"] else "norm")
+    fig, ax = plt.subplots(figsize=(8,3))
+    ax.hist(dados, bins=80)
+    ax.set_title("Distribuição dos Multiplicadores Finais")
+    st.pyplot(fig)
 
-    return {
-        "nome": nome,
-        "params": params,
-        "KS": ks.statistic,
-        "p-value": ks.pvalue,
-        "AD": ad.statistic
-    }
+# =========================================================
+# ABA 2 — DECISÃO CONDICIONAL (AVIATOR REAL)
+# =========================================================
 
-print("\n===== TESTE DE DISTRIBUIÇÕES =====")
+with aba2:
+    st.subheader("Estado Atual do Jogo")
 
-candidatas = [
-    (stats.lognorm, "Lognormal"),
-    (stats.gamma, "Gamma"),
-    (stats.expon, "Exponencial"),
-    (stats.weibull_min, "Weibull")
-]
+    x_atual = st.number_input(
+        "Multiplicador atual do jogo",
+        min_value=1.01,
+        value=1.50,
+        step=0.01
+    )
 
-resultados = [testar_distribuicao(dist, nome) for dist, nome in candidatas]
+    cond = distribuicao_condicional(dados, x_atual)
 
-for r in resultados:
-    print(f"\n{r['nome']}:")
-    print(f"  KS = {r['KS']:.5f}")
-    print(f"  p-value = {r['p-value']:.5f}")
-    print(f"  AD = {r['AD']:.5f}")
+    if len(cond) < 50:
+        st.error("⚠️ Poucos dados históricos acima desse valor. Decisão instável.")
+        st.stop()
 
-# ----------------------------------------------------------
-# 5) AJUSTE DE DISTRIBUIÇÃO MISTA (LOGNORMAL + PARETO)
-# ----------------------------------------------------------
+    st.caption(
+        f"Base estatística: {len(cond)} jogos históricos chegaram a pelo menos {x_atual:.2f}x"
+    )
 
-print("\n===== AJUSTE DE MISTURA =====")
+    # Alvos típicos do Aviator
+    alvos = [
+        round(x_atual + 0.2, 2),
+        round(x_atual + 0.5, 2),
+        round(x_atual + 1.0, 2),
+        2.0, 3.0, 5.0, 10.0
+    ]
 
-p95 = np.percentile(x, 95)
-x_comum = x[x < p95]
-x_raro = x[x >= p95]
+    alvos = sorted(set([a for a in alvos if a > x_atual]))
 
-# Ajustar parte comum (lognormal)
-params_lognorm = lognorm.fit(x_comum)
+    rows = []
 
-# Ajustar parte rara (pareto)
-params_pareto = pareto.fit(x_raro)
+    for alvo in alvos:
+        p = prob_atingir(dados, x_atual, alvo)
+        ev = valor_esperado_continuar(x_atual, alvo, p)
 
-p_comum = len(x_comum) / len(x)
-p_raro = 1 - p_comum
+        rows.append({
+            "Cashout alvo": f"{alvo:.2f}x",
+            "Prob. de atingir": f"{p*100:.1f}%",
+            "Valor esperado": formatar(ev)
+        })
 
-print(f"Probabilidade comum: {p_comum:.3f}")
-print(f"Probabilidade rara:  {p_raro:.3f}")
+    df_decisao = pd.DataFrame(rows)
+    st.dataframe(df_decisao, use_container_width=True)
 
-def sorteio():
-    if np.random.rand() < p_comum:
-        return lognorm(*params_lognorm).rvs()
+    # Melhor decisão
+    melhor = melhor_cashout(dados, x_atual, alvos)[0]
+
+    st.markdown("---")
+
+    if melhor[2] > 0:
+        st.success(
+            f"✅ Melhor decisão estatística: **cashout em {melhor[0]:.2f}x** "
+            f"(EV = {formatar(melhor[2])})"
+        )
     else:
-        return pareto(*params_pareto).rvs()
+        st.error(
+            "❌ Nenhum cashout acima deste ponto apresenta valor esperado positivo.\n\n"
+            "**Decisão racional: NÃO entrar ou sair imediatamente.**"
+        )
 
-# ----------------------------------------------------------
-# 6) SIMULAÇÃO MONTE CARLO
-# ----------------------------------------------------------
-
-print("\nGerando 10.000 valores simulados...")
-sim = np.array([sorteio() for _ in range(10000)])
-
-plt.figure(figsize=(10,5))
-sns.kdeplot(x, label="Real")
-sns.kdeplot(sim, label="Simulado")
-plt.title("Comparação Real vs Simulado")
-plt.legend()
-plt.savefig("graficos/comparacao_real_simulado.png")
-plt.close()
-
-print("\nSimulação concluída! Gráficos salvos na pasta /graficos.")
-
-# ----------------------------------------------------------
-# 7) SALVAR RESULTADOS IMPORTANTES
-# ----------------------------------------------------------
-
-resultado_dict = {
-    "media_real": np.mean(x),
-    "media_simulada": np.mean(sim),
-    "p95_real": p95,
-    "parametros_lognorm": params_lognorm,
-    "parametros_pareto": params_pareto,
-}
-
-pd.DataFrame([resultado_dict]).to_csv("resultados_distribuicao.csv", index=False)
-
-print("\nArquivo resultados_distribuicao.csv criado!")
-print("\n=== FINALIZADO ===")
-
-
-
-
-
+    # Regras claras para o jogador
+    st.markdown(
+        """
+        ### 📌 Interpretação prática
+        - **Prob. de atingir**: chance real baseada em milhares de jogos
+        - **Valor esperado**:
+            - positivo → decisão racional
+            - negativo → cassino tem vantagem
+        - Se **todos os EV forem negativos**, o melhor movimento é **não jogar**
+        """
+    )
