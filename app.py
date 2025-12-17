@@ -11,7 +11,7 @@ CAMINHO_ARQUIVO = "Resultados.csv"
 COLUNA_VALOR = "valor"
 
 st.set_page_config(
-    page_title="Probabilidade Condicional",
+    page_title="Probabilidade Condicional — Aviator",
     layout="wide"
 )
 
@@ -34,71 +34,84 @@ def carregar_dados():
 dados = carregar_dados()
 
 # =========================================================
-# PROBABILIDADE CONDICIONAL 
+# PROBABILIDADE CONDICIONAL (CORE AVIATOR)
 # =========================================================
 
 def distribuicao_condicional(dados, x_atual):
-    """Distribuição dos multiplicadores finais dado que o jogo já chegou em x_atual"""
     return dados[dados >= x_atual]
 
 
 def prob_atingir(dados, x_atual, alvo):
     cond = distribuicao_condicional(dados, x_atual)
-    if len(cond) == 0 or alvo < x_atual:
+    if len(cond) == 0 or alvo <= x_atual:
         return 0.0
     return np.mean(cond >= alvo)
 
 
 def valor_esperado_continuar(x_atual, alvo, prob):
-    """
-    EV simples e honesto:
-    - se chegar no alvo → ganha (alvo - x_atual)
-    - se crashar antes → perde x_atual
-    """
     ganho = alvo - x_atual
     perda = x_atual
     return prob * ganho - (1 - prob) * perda
 
 
-def melhor_cashout(dados, x_atual, alvos):
-    resultados = []
+def tabela_decisao(dados, x_atual, alvos):
+    linhas = []
 
     for alvo in alvos:
         p = prob_atingir(dados, x_atual, alvo)
         ev = valor_esperado_continuar(x_atual, alvo, p)
-        resultados.append((alvo, p, ev))
+        linhas.append({
+            "Cashout alvo": f"{alvo:.2f}x",
+            "Prob. de atingir": p,
+            "Valor esperado": ev
+        })
 
-    return sorted(resultados, key=lambda x: x[2], reverse=True)
+    df = pd.DataFrame(linhas)
+    return df.sort_values("Valor esperado", ascending=False)
 
 # =========================================================
 # INTERFACE
 # =========================================================
 
-st.title(" Análise Condicional em Tempo Real")
+st.title("✈️ Análise Condicional — Aviator")
 
 aba1, aba2 = st.tabs([
-    "📊 Visão Geral",
+    "📊 Dados & Análises",
     "🧠 Decisão Condicional"
 ])
 
 # =========================================================
-# ABA 1 — VISÃO GERAL (ENXUTA)
+# ABA 1 — DADOS & ANÁLISES
 # =========================================================
 
 with aba1:
-    c1, c2, c3 = st.columns(3)
+    st.subheader("Base Estatística Utilizada")
 
+    c1, c2, c3 = st.columns(3)
     c1.metric("Total de jogos", f"{len(dados):,}")
     c2.metric("Multiplicador médio", formatar(dados.mean()))
     c3.metric("Máximo histórico", formatar(dados.max()))
 
-    fig, ax = plt.subplots(figsize=(8,3))
+    st.markdown("### Distribuição dos multiplicadores finais")
+
+    fig, ax = plt.subplots(figsize=(9,4))
     ax.hist(dados, bins=80)
-    ax.set_title("Distribuição dos Multiplicadores Finais")
+    ax.set_xlabel("Multiplicador final")
+    ax.set_ylabel("Frequência")
     st.pyplot(fig)
 
+    st.markdown(
+        """
+        **Como esses dados são usados:**
+
+        - Cada valor representa o **multiplicador final de um jogo**
+        - A análise condicional usa **apenas jogos que passaram pelo valor atual**
+        - Isso garante que a decisão seja baseada no **estado real do jogo**
+        """
+    )
+
 # =========================================================
-# ABA 2 — DECISÃO CONDICIONAL (AVIATOR REAL)
+# ABA 2 — DECISÃO CONDICIONAL
 # =========================================================
 
 with aba2:
@@ -114,63 +127,58 @@ with aba2:
     cond = distribuicao_condicional(dados, x_atual)
 
     if len(cond) < 50:
-        st.error("⚠️ Poucos dados históricos acima desse valor. Decisão instável.")
+        st.error("⚠️ Base estatística insuficiente acima desse valor.")
         st.stop()
 
     st.caption(
-        f"Base estatística: {len(cond)} jogos históricos chegaram a pelo menos {x_atual:.2f}x"
+        f"{len(cond)} jogos históricos chegaram a pelo menos {x_atual:.2f}x"
     )
 
-    # Alvos típicos do Aviator
-    alvos = [
+    # Alvos possíveis
+    alvos = sorted(set([
         round(x_atual + 0.2, 2),
         round(x_atual + 0.5, 2),
         round(x_atual + 1.0, 2),
         2.0, 3.0, 5.0, 10.0
-    ]
+    ]))
 
-    alvos = sorted(set([a for a in alvos if a > x_atual]))
+    alvos = [a for a in alvos if a > x_atual]
 
-    rows = []
+    df_decisao = tabela_decisao(dados, x_atual, alvos)
 
-    for alvo in alvos:
-        p = prob_atingir(dados, x_atual, alvo)
-        ev = valor_esperado_continuar(x_atual, alvo, p)
+    # Exibição formatada
+    df_show = df_decisao.copy()
+    df_show["Prob. de atingir"] = df_show["Prob. de atingir"].apply(lambda x: f"{x*100:.1f}%")
+    df_show["Valor esperado"] = df_show["Valor esperado"].apply(formatar)
 
-        rows.append({
-            "Cashout alvo": f"{alvo:.2f}x",
-            "Prob. de atingir": f"{p*100:.1f}%",
-            "Valor esperado": formatar(ev)
-        })
+    st.markdown("### Probabilidades condicionais e valor esperado")
+    st.dataframe(df_show, use_container_width=True)
 
-    df_decisao = pd.DataFrame(rows)
-    st.dataframe(df_decisao, use_container_width=True)
-
-    # Melhor decisão
-    melhor = melhor_cashout(dados, x_atual, alvos)[0]
+    # DECISÃO FINAL DE ENTRADA
+    melhor = df_decisao.iloc[0]
+    ev_max = melhor["Valor esperado"]
 
     st.markdown("---")
+    st.subheader("📌 Decisão Final")
 
-    if melhor[2] > 0:
+    if ev_max > 0:
         st.success(
-            f"✅ Melhor decisão estatística: **cashout em {melhor[0]:.2f}x** "
-            f"(EV = {formatar(melhor[2])})"
+            f"✅ **APOSTAR AGORA**\n\n"
+            f"Melhor cashout estatístico: **{melhor['Cashout alvo']}**\n\n"
+            f"Valor esperado positivo: **{formatar(ev_max)}**"
         )
     else:
         st.error(
-            "❌ Nenhum cashout acima deste ponto apresenta valor esperado positivo.\n\n"
-            "**Decisão racional: NÃO entrar ou sair imediatamente.**"
+            "❌ **NÃO APOSTAR AGORA**\n\n"
+            "Nenhum cenário acima deste ponto apresenta valor esperado positivo.\n\n"
+            "A decisão racional é **não entrar** ou **sair imediatamente**."
         )
 
-    # Regras claras para o jogador
     st.markdown(
         """
-        ### 📌 Interpretação prática
-        - **Prob. de atingir**: chance real baseada em milhares de jogos
-        - **Valor esperado**:
-            - positivo → decisão racional
-            - negativo → cassino tem vantagem
-        - Se **todos os EV forem negativos**, o melhor movimento é **não jogar**
+        **Como interpretar a decisão:**
+        - A entrada só é recomendada se **existe EV positivo**
+        - O cashout indicado é o **ponto estatisticamente ótimo**
+        - Se o EV for negativo, o jogo favorece o cassino
         """
     )
-
