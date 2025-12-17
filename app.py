@@ -74,7 +74,7 @@ def melhor_cashout(dados, x_atual, alvos):
 # INTERFACE
 # =========================================================
 
-st.title("✈️ Aviator — Análise Condicional em Tempo Real")
+st.title(" Análise Condicional em Tempo Real")
 
 aba1, aba2 = st.tabs([
     "📊 Visão Geral",
@@ -173,3 +173,4 @@ with aba2:
         - Se **todos os EV forem negativos**, o melhor movimento é **não jogar**
         """
     )
+
