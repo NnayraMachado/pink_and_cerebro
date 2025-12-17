@@ -3,15 +3,30 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
-from scipy.stats import lognorm, pareto
+
+from scipy.stats import (
+    norm, lognorm, expon, pareto,
+    kstest, anderson
+)
+import math
+
+# =========================================================
+# CONFIGURAÇÃO
+# =========================================================
 
 CAMINHO_ARQUIVO = "Resultados.csv"
+COLUNA_VALOR = "valor"
 
+st.set_page_config(
+    page_title="Sistema de Probabilidade e Decisão",
+    layout="wide"
+)
 
-from scipy.stats import norm
+# =========================================================
+# FUNÇÕES AUXILIARES
+# =========================================================
 
 def criar_kde_percentil(dados, p, pontos=150):
-    """Gera KDE entre xmin e o valor do percentil p."""
     dados = np.array([float(v) for v in dados if not pd.isna(v)])
     n = len(dados)
 
@@ -19,7 +34,6 @@ def criar_kde_percentil(dados, p, pontos=150):
     xmin = np.min(dados)
     xmax = limite
 
-    # Bandwidth Silverman
     sd = np.std(dados, ddof=1)
     q1 = np.percentile(dados, 25)
     q3 = np.percentile(dados, 75)
@@ -31,234 +45,11 @@ def criar_kde_percentil(dados, p, pontos=150):
 
     for x in x_vals:
         densidade = np.sum(norm.pdf(x, loc=dados, scale=h)) / (n * h)
-        kde_vals.append(round(densidade, 6))
+        kde_vals.append(densidade)
 
     return x_vals, np.array(kde_vals), limite
 
 
-# Título
-st.title("Sistema de Probabilidade - Análise & Simulação")
-
-# Carregar dados
-df = pd.read_csv(CAMINHO_ARQUIVO)
-dados = df["valor"]          # <- não removemos NaN ainda
-dados_validos = dados.dropna()
-
-# ---------------------------------------------------------
-# ESTATÍSTICAS DESCRITIVAS
-# ---------------------------------------------------------
-st.subheader("Estatísticas Descritivas")
-st.write(df.describe())
-
-st.markdown("<br>", unsafe_allow_html=True)
-st.divider()
-
-# ---------------------------------------------------------
-# PERCENTIS 55 / 95 / 99 (incluindo nulos no total)
-# ---------------------------------------------------------
-st.subheader("Percentis 55, 95 e 99")
-
-total = len(dados)
-validos = len(dados_validos)
-nulos = dados.isna().sum()
-
-p55 = np.percentile(dados_validos, 55)
-p95 = np.percentile(dados_validos, 95)
-p99 = np.percentile(dados_validos, 99)
-
-df_percentis = pd.DataFrame({
-    "Medida": ["Total registros", "Válidos", "Nulos", "P55", "P95", "P99"],
-    "Valor": [total, validos, nulos, p55, p95, p99]
-})
-
-st.write(df_percentis)
-
-st.markdown("<br>", unsafe_allow_html=True)
-st.divider()
-
-# ---------------------------------------------------------
-# QUARTIS POR INTERVALOS
-# ---------------------------------------------------------
-
-st.subheader("Quartis (Q0, Q1, Q2, Q3, Q4)")
-
-# Dados válidos para cálculo
-dados_validos = df["valor"].dropna().astype(float)
-
-# Quartis
-Q0 = np.min(dados_validos)
-Q1 = np.percentile(dados_validos, 25)
-Q2 = np.percentile(dados_validos, 50)
-Q3 = np.percentile(dados_validos, 75)
-Q4 = np.max(dados_validos)
-
-# Tabela
-df_quartis = pd.DataFrame({
-    "Quartil": ["Q0 (Mínimo)", "Q1 (25%)", "Q2 (50% - Mediana)", "Q3 (75%)", "Q4 (Máximo)"],
-    "Valor": [Q0, Q1, Q2, Q3, Q4]
-})
-
-st.write(df_quartis)
-
-st.markdown("<br>", unsafe_allow_html=True)
-
-# ---------------------------------------------------------
-# GRÁFICO 1 — HISTOGRAMA + LINHAS DOS QUARTIS
-# ---------------------------------------------------------
-
-fig, ax = plt.subplots(figsize=(10,4))
-sns.histplot(dados_validos, bins=60, kde=True, ax=ax, color="steelblue")
-
-ax.axvline(Q0, color="black", linestyle="--", linewidth=1.5, label=f"Q0 (min) = {Q0:.2f}")
-ax.axvline(Q1, color="blue", linestyle="--", linewidth=1.8, label=f"Q1 = {Q1:.2f}")
-ax.axvline(Q2, color="green", linestyle="--", linewidth=2.2, label=f"Q2 = {Q2:.2f}")
-ax.axvline(Q3, color="orange", linestyle="--", linewidth=1.8, label=f"Q3 = {Q3:.2f}")
-ax.axvline(Q4, color="red", linestyle="--", linewidth=1.5, label=f"Q4 (máx) = {Q4:.2f}")
-
-ax.legend()
-ax.set_title("Histograma com Quartis (Q0, Q1, Q2, Q3, Q4)")
-
-st.pyplot(fig)
-
-st.markdown("<br><br>", unsafe_allow_html=True)
-st.divider()
-
-# ---------------------------------------------------------
-# GRÁFICO 2 — BOXPLOT DOS QUARTIS
-# ---------------------------------------------------------
-
-st.subheader("Boxplot dos Quartis")
-
-fig, ax = plt.subplots(figsize=(10,3))
-sns.boxplot(x=dados_validos, ax=ax, color="skyblue")
-ax.set_title("Boxplot – Distribuição dos Quartis")
-
-st.pyplot(fig)
-
-# ---------------------------------------------------------
-# HISTOGRAMA POR INTERVALOS
-# ---------------------------------------------------------
-st.subheader("Histograma por Intervalos")
-
-bins = [0,10,20,30,40,50,100]
-frequencias, _ = np.histogram(dados_validos, bins=bins)
-acima = (dados_validos > bins[-1]).sum()
-
-faixas = [f"{bins[i-1]} – {bins[i]}" for i in range(1, len(bins))]
-faixas.append(f"Acima de {bins[-1]}")
-faixas.append("Vazios")
-
-freq_final = list(frequencias) + [acima] + [nulos]
-
-df_hist = pd.DataFrame({
-    "Faixa": faixas,
-    "Frequência": freq_final
-})
-
-st.write(df_hist)
-
-# Gráfico
-fig, ax = plt.subplots(figsize=(10,4))
-ax.bar(df_hist["Faixa"], df_hist["Frequência"], color="steelblue")
-plt.xticks(rotation=45)
-ax.set_title("Histograma – Intervalos Excel")
-st.pyplot(fig)
-
-st.markdown("<br><br>", unsafe_allow_html=True)
-st.divider()
-
-# ---------------------------------------------------------
-# HISTOGRAMA NORMAL COM LINHAS DOS PERCENTIS
-# ---------------------------------------------------------
-st.subheader("Histograma Geral com Percentis")
-
-fig, ax = plt.subplots(figsize=(10,4))
-sns.histplot(dados_validos, bins=50, kde=True, ax=ax)
-
-# Linhas verticais dos percentis
-ax.axvline(p55, color='green', linestyle='--', linewidth=2, label=f"P55 = {p55:.2f}")
-ax.axvline(p95, color='orange', linestyle='--', linewidth=2, label=f"P95 = {p95:.2f}")
-ax.axvline(p99, color='red', linestyle='--', linewidth=2, label=f"P99 = {p99:.2f}")
-
-ax.legend()
-ax.set_title("Histograma com Percentis 55, 95 e 99")
-st.pyplot(fig)
-
-st.markdown("<br><br>", unsafe_allow_html=True)
-st.divider()
-
-st.markdown("<br><br>", unsafe_allow_html=True)
-st.divider()
-
-# ---------------------------------------------------------
-# K D E   P O R   P E R C E N T I S   (55 / 95 / 99)
-# ---------------------------------------------------------
-
-st.subheader("Curvas KDE para Percentis 55, 95 e 99")
-
-# ---------------- KDE P55 ----------------
-x55, kde55, limite55 = criar_kde_percentil(dados_validos, 0.55)
-
-df_kde55 = pd.DataFrame({"X": x55, "KDE": kde55})
-st.write("### KDE – Percentil 55%")
-st.write(df_kde55.head(20))  # Mostra só 20 linhas no app
-
-fig, ax = plt.subplots(figsize=(10,4))
-ax.plot(x55, kde55, color="green")
-ax.set_title(f"KDE até o Percentil 55 (P55 = {limite55:.2f})")
-ax.set_xlabel("X")
-ax.set_ylabel("Densidade")
-st.pyplot(fig)
-
-st.markdown("<br>", unsafe_allow_html=True)
-st.divider()
-
-# ---------------- KDE P95 ----------------
-x95, kde95, limite95 = criar_kde_percentil(dados_validos, 0.95)
-
-df_kde95 = pd.DataFrame({"X": x95, "KDE": kde95})
-st.write("### KDE – Percentil 95%")
-st.write(df_kde95.head(20))
-
-fig, ax = plt.subplots(figsize=(10,4))
-ax.plot(x95, kde95, color="orange")
-ax.set_title(f"KDE até o Percentil 95 (P95 = {limite95:.2f})")
-ax.set_xlabel("X")
-ax.set_ylabel("Densidade")
-st.pyplot(fig)
-
-st.markdown("<br>", unsafe_allow_html=True)
-st.divider()
-
-# ---------------- KDE P99 ----------------
-x99, kde99, limite99 = criar_kde_percentil(dados_validos, 0.99)
-
-df_kde99 = pd.DataFrame({"X": x99, "KDE": kde99})
-st.write("### KDE – Percentil 99%")
-st.write(df_kde99.head(20))
-
-fig, ax = plt.subplots(figsize=(10,4))
-ax.plot(x99, kde99, color="red")
-ax.set_title(f"KDE até o Percentil 99 (P99 = {limite99:.2f})")
-ax.set_xlabel("X")
-ax.set_ylabel("Densidade")
-st.pyplot(fig)
-
-# =========================================================
-# TESTES DE ADERÊNCIA — KS, AD, AIC, BIC
-# =========================================================
-
-st.markdown("<br><br>", unsafe_allow_html=True)
-st.divider()
-st.subheader("Teste de Aderência – KS, AD, AIC, BIC")
-
-from scipy.stats import kstest, anderson, norm, lognorm, expon, pareto
-import math
-
-
-# ---------------------------------------------------------
-# Função auxiliar: calcular log-verossimilhança
-# ---------------------------------------------------------
 def log_likelihood(dist, params, data):
     try:
         pdf_vals = dist.pdf(data, *params)
@@ -268,137 +59,200 @@ def log_likelihood(dist, params, data):
         return -np.inf
 
 
-# ---------------------------------------------------------
-# Distribuições candidatas
-# ---------------------------------------------------------
-distros = {
-    "Normal": norm,
-    "Lognormal": lognorm,
-    "Exponencial": expon,
-    "Pareto": pareto
-}
+# =========================================================
+# 🧠 CAMADA DE DECISÃO
+# =========================================================
 
-resultados = []
+def avaliar_jogo(sim):
+    sim = np.array(sim)
 
-for nome, dist in distros.items():
+    prob_perda = np.mean(sim < 0)
+    valor_esperado = np.mean(sim)
 
-    # Ajuste da distribuição
-    params = dist.fit(dados_validos)
+    p5 = np.percentile(sim, 5)
+    p1 = np.percentile(sim, 1)
 
-    # KS
-    D, p_ks = kstest(dados_validos, dist.cdf, params)
+    ganho_medio = np.mean(sim[sim > 0]) if np.any(sim > 0) else 0
+    perda_media = np.mean(sim[sim < 0]) if np.any(sim < 0) else 0
 
-    # AD
-    try:
-        ad = anderson(dados_validos, dist='norm') if nome=="Normal" else anderson(dados_validos)
-        AD = ad.statistic
-    except:
-        AD = np.nan
+    if valor_esperado < 0 and prob_perda > 0.5:
+        decisao = "❌ NÃO VALE A PENA JOGAR"
+        explicacao = "Valor esperado negativo e alta probabilidade de perda."
+    elif valor_esperado > 0 and prob_perda < 0.3:
+        decisao = "✅ VALE A PENA JOGAR"
+        explicacao = "Valor esperado positivo com risco controlado."
+    elif valor_esperado > 0 and prob_perda >= 0.3:
+        decisao = "⚠️ JOGO ARRISCADO"
+        explicacao = "Lucro esperado positivo, porém com alta volatilidade."
+    else:
+        decisao = "⚠️ CENÁRIO INDEFINIDO"
+        explicacao = "Risco e retorno próximos do limite."
 
-    # AIC / BIC
-    ll = log_likelihood(dist, params, dados_validos)
-    k = len(params)
-    n = len(dados_validos)
-
-    AIC = 2 * k - 2 * ll
-    BIC = k * math.log(n) - 2 * ll
-
-    resultados.append([nome, D, p_ks, AD, AIC, BIC, params])
-
-
-# ---------------------------------------------------------
-# Tabela organizada
-# ---------------------------------------------------------
-df_aderencia = pd.DataFrame(
-    resultados,
-    columns=["Distribuição", "KS (D)", "KS p-valor", "AD", "AIC", "BIC", "Parâmetros"]
-)
-
-# Ordenar pela melhor métrica (menor KS)
-df_aderencia = df_aderencia.sort_values("KS (D)")
-
-st.write(df_aderencia)
-
-# Melhor distribuição encontrada
-melhor = df_aderencia.iloc[0]
-st.success(f"Melhor ajuste (menor KS): **{melhor['Distribuição']}**  — D = {melhor['KS (D)']:.4f}")
+    return {
+        "Probabilidade de perda": prob_perda,
+        "Valor esperado": valor_esperado,
+        "Pior perda (P5)": p5,
+        "Pior perda extrema (P1)": p1,
+        "Ganho médio": ganho_medio,
+        "Perda média": perda_media,
+        "Decisão": decisao,
+        "Explicação": explicacao
+    }
 
 
 # =========================================================
-# GRÁFICOS — CDF e PDF COMPARANDO REAL VS AJUSTADO
+# CARREGAMENTO DOS DADOS
 # =========================================================
 
-st.subheader("CDF Real vs Ajustada")
-
-dist_melhor = distros[melhor["Distribuição"]]
-params_melhor = melhor["Parâmetros"]
-
-# Dados ordenados
-x_sorted = np.sort(dados_validos)
-cdf_real = np.arange(1, len(x_sorted)+1) / len(x_sorted)
-cdf_ajustada = dist_melhor.cdf(x_sorted, *params_melhor)
-
-fig, ax = plt.subplots(figsize=(10,4))
-ax.plot(x_sorted, cdf_real, label="CDF Real", linewidth=2)
-ax.plot(x_sorted, cdf_ajustada, label=f"CDF Ajustada — {melhor['Distribuição']}", linestyle="--")
-ax.legend()
-ax.set_title("Comparação da CDF Real vs Ajustada")
-st.pyplot(fig)
+df = pd.read_csv(CAMINHO_ARQUIVO)
+dados = df[COLUNA_VALOR]
+dados_validos = dados.dropna().astype(float)
 
 # =========================================================
-# PDF COMPARAÇÃO
+# LAYOUT COM ABAS
 # =========================================================
 
-st.subheader("PDF Real (KDE) vs PDF Ajustada")
+st.title("📊 Sistema de Probabilidade, Simulação e Decisão")
 
-# KDE real
-kde = sns.kdeplot(dados_validos, bw_adjust=1).get_lines()[0].get_data()
-plt.close()  # evita plot anterior
+aba1, aba2, aba3, aba4 = st.tabs([
+    "📊 Visão Geral",
+    "📈 Distribuições & Ajustes",
+    "🎲 Simulação Monte Carlo",
+    "🧠 Decisão do Jogador"
+])
 
-x_kde, y_kde = kde
+# =========================================================
+# ABA 1 — VISÃO GERAL
+# =========================================================
 
-# PDF ajustada
-pdf_ajustada = dist_melhor.pdf(x_kde, *params_melhor)
+with aba1:
+    st.subheader("Estatísticas Descritivas")
+    st.write(dados_validos.describe())
 
-fig, ax = plt.subplots(figsize=(10,4))
-ax.plot(x_kde, y_kde, label="PDF Real (KDE)", linewidth=2)
-ax.plot(x_kde, pdf_ajustada, label=f"PDF Ajustada — {melhor['Distribuição']}", linestyle="--")
-ax.legend()
-ax.set_title("Comparação da PDF Real (KDE) vs Ajustada")
-st.pyplot(fig)
+    p55 = np.percentile(dados_validos, 55)
+    p95 = np.percentile(dados_validos, 95)
+    p99 = np.percentile(dados_validos, 99)
 
+    st.subheader("Percentis Importantes")
+    st.write(pd.DataFrame({
+        "Percentil": ["P55", "P95", "P99"],
+        "Valor": [p55, p95, p99]
+    }))
 
+    fig, ax = plt.subplots(figsize=(10,4))
+    sns.histplot(dados_validos, bins=60, kde=True, ax=ax)
+    ax.axvline(p55, color="green", linestyle="--", label="P55")
+    ax.axvline(p95, color="orange", linestyle="--", label="P95")
+    ax.axvline(p99, color="red", linestyle="--", label="P99")
+    ax.legend()
+    ax.set_title("Histograma com Percentis")
+    st.pyplot(fig)
 
-# ---------------------------------------------------------
-# DISTRIBUIÇÃO MISTA E SIMULAÇÃO
-# ---------------------------------------------------------
-st.subheader("Simulação Monte Carlo Baseada na Distribuição Mista")
+# =========================================================
+# ABA 2 — DISTRIBUIÇÕES E AJUSTES
+# =========================================================
 
-x_comum = dados_validos[dados_validos < p95]
-x_raro = dados_validos[dados_validos >= p95]
+with aba2:
+    st.subheader("Teste de Aderência (KS, AD, AIC, BIC)")
 
-params_lognorm = lognorm.fit(x_comum)
-params_pareto = pareto.fit(x_raro)
+    distros = {
+        "Normal": norm,
+        "Lognormal": lognorm,
+        "Exponencial": expon,
+        "Pareto": pareto
+    }
 
-p_comum = len(x_comum) / len(dados_validos)
+    resultados = []
 
-def sorteio():
-    return lognorm(*params_lognorm).rvs() if np.random.rand() < p_comum else pareto(*params_pareto).rvs()
+    for nome, dist in distros.items():
+        params = dist.fit(dados_validos)
 
-n = st.slider("Número de sorteios", 100, 20000, 5000)
-sim = np.array([sorteio() for _ in range(n)])
+        D, p_ks = kstest(dados_validos, dist.cdf, params)
 
-fig, ax = plt.subplots(figsize=(8,4))
-sns.kdeplot(sim, ax=ax, label="Simulado")
-sns.kdeplot(dados_validos, ax=ax, label="Real")
-ax.legend()
-ax.set_title("Distribuição Real vs Simulada")
-st.pyplot(fig)
+        try:
+            ad = anderson(dados_validos, dist='norm')
+            AD = ad.statistic
+        except:
+            AD = np.nan
 
-st.success("Simulação concluída!")
+        ll = log_likelihood(dist, params, dados_validos)
+        k = len(params)
+        n = len(dados_validos)
 
+        AIC = 2 * k - 2 * ll
+        BIC = k * math.log(n) - 2 * ll
 
+        resultados.append([nome, D, p_ks, AD, AIC, BIC, params])
 
+    df_aderencia = pd.DataFrame(
+        resultados,
+        columns=["Distribuição", "KS", "KS p-valor", "AD", "AIC", "BIC", "Parâmetros"]
+    ).sort_values("KS")
 
+    st.write(df_aderencia)
 
+    melhor = df_aderencia.iloc[0]
+    st.success(f"Melhor ajuste: **{melhor['Distribuição']}**")
 
+# =========================================================
+# ABA 3 — SIMULAÇÃO MONTE CARLO
+# =========================================================
+
+with aba3:
+    st.subheader("Simulação Monte Carlo (Distribuição Mista)")
+
+    p95 = np.percentile(dados_validos, 95)
+    x_comum = dados_validos[dados_validos < p95]
+    x_raro = dados_validos[dados_validos >= p95]
+
+    params_lognorm = lognorm.fit(x_comum)
+    params_pareto = pareto.fit(x_raro)
+
+    p_comum = len(x_comum) / len(dados_validos)
+
+    def sorteio():
+        return (
+            lognorm(*params_lognorm).rvs()
+            if np.random.rand() < p_comum
+            else pareto(*params_pareto).rvs()
+        )
+
+    n_sim = st.slider("Número de simulações", 1000, 30000, 5000, step=1000)
+    sim = np.array([sorteio() for _ in range(n_sim)])
+
+    fig, ax = plt.subplots(figsize=(10,4))
+    sns.kdeplot(dados_validos, ax=ax, label="Real")
+    sns.kdeplot(sim, ax=ax, label="Simulado")
+    ax.legend()
+    ax.set_title("Distribuição Real vs Simulada")
+    st.pyplot(fig)
+
+# =========================================================
+# ABA 4 — 🧠 DECISÃO DO JOGADOR
+# =========================================================
+
+with aba4:
+    st.subheader("Camada de Decisão do Jogador")
+
+    resultado = avaliar_jogo(sim)
+
+    col1, col2, col3 = st.columns(3)
+
+    col1.metric("Prob. de Perda", f"{resultado['Probabilidade de perda']*100:.1f}%")
+    col2.metric("Valor Esperado", f"{resultado['Valor esperado']:.2f}")
+    col3.metric("Ganho Médio", f"{resultado['Ganho médio']:.2f}")
+
+    col1.metric("Pior perda (P5)", f"{resultado['Pior perda (P5)']:.2f}")
+    col2.metric("Pior perda extrema (P1)", f"{resultado['Pior perda extrema (P1)']:.2f}")
+    col3.metric("Perda Média", f"{resultado['Perda média']:.2f}")
+
+    st.markdown("---")
+
+    if "NÃO VALE" in resultado["Decisão"]:
+        st.error(resultado["Decisão"])
+    elif "VALE" in resultado["Decisão"]:
+        st.success(resultado["Decisão"])
+    else:
+        st.warning(resultado["Decisão"])
+
+    st.write(resultado["Explicação"])
